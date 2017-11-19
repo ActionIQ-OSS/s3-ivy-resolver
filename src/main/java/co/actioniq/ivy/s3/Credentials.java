@@ -19,25 +19,56 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSCredentialsProviderChain;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.BasicSessionCredentials;
+import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
+import com.amazonaws.auth.InstanceProfileCredentialsProvider;
+import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient;
 import com.amazonaws.services.securitytoken.model.AssumeRoleRequest;
 import com.amazonaws.services.securitytoken.model.AssumeRoleResult;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Properties;
 
 class Credentials {
   private Credentials() {}
 
   static String toEnvironmentVariableName(String s) {
     return s.toUpperCase().replace('-', '_').replace('.', '_').replaceAll("[^A-Z0-9_]", "");
+  }
+
+  static AWSCredentialsProvider makeCredentialsProvider(String profile, String bucket) {
+    Log.print("makeCredentialsProvider profile: " + profile + ", bucket: " + bucket);
+    AWSCredentialsProvider[] basicProviders = {
+        new BucketSpecificEnvironmentVariableCredentialsProvider(bucket),
+        new BucketSpecificSystemPropertiesCredentialsProvider(bucket),
+        new EnvironmentVariableCredentialsProvider(),
+        new SystemPropertiesCredentialsProvider(),
+        new InstanceProfileCredentialsProvider(),
+        new ProfileCredentialsProvider(profile)
+    };
+
+    AWSCredentialsProviderChain basicProviderChain = new AWSCredentialsProviderChain(basicProviders);
+
+    AWSCredentialsProvider[] roleProviders = {
+        new BucketSpecificRoleBasedEnvironmentVariableCredentialsProvider(basicProviderChain, bucket),
+        new BucketSpecificRoleBasedSystemPropertiesCredentialsProvider(basicProviderChain, bucket),
+        new RoleBasedEnvironmentVariableCredentialsProvider(basicProviderChain),
+        new RoleBasedSystemPropertiesCredentialsProvider(basicProviderChain),
+    };
+
+    List<AWSCredentialsProvider> providerList = new ArrayList<>();
+    providerList.addAll(Arrays.asList(roleProviders));
+    providerList.addAll(Arrays.asList(basicProviders));
+    AWSCredentialsProvider[] providerArray = providerList.toArray(new AWSCredentialsProvider[providerList.size()]);
+
+    AWSCredentialsProvider providerChain = new AWSCredentialsProviderChain(providerArray);
+    Log.print("credentials: " + providerChain.getCredentials());
+
+    return providerChain;
   }
 }
 
@@ -189,37 +220,6 @@ class RoleBasedEnvironmentVariableCredentialsProvider extends RoleBasedCredentia
         .findFirst()
         .get()
         .trim();
-  }
-}
-
-
-class RoleBasedPropertiesFileCredentialsProvider extends RoleBasedCredentialsProvider {
-  private final String fileName;
-
-  RoleBasedPropertiesFileCredentialsProvider(AWSCredentialsProviderChain providerChain, String fileName) {
-    super(providerChain);
-    this.fileName = fileName;
-  }
-
-  private String RoleArnKeyName() {
-    return "roleArn";
-  }
-
-  List<String> RoleArnKeyNames() {
-    return Collections.singletonList(RoleArnKeyName());
-  }
-
-  String getRoleArn(List<String> keys) {
-    File file = new File(Constants.DotIvyDir, fileName);
-
-    try (InputStream is = new FileInputStream(file)) {
-      Properties props = new Properties();
-      props.load(is);
-      // This will throw if there is no matching properties
-      return RoleArnKeyNames().stream().map(props::getProperty).filter(Objects::nonNull).findFirst().get().trim();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
   }
 }
 

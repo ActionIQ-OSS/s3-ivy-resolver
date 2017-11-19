@@ -20,13 +20,19 @@ import java.net.URLStreamHandler;
 import java.net.URLStreamHandlerFactory;
 
 class S3URLStreamHandlerFactory implements URLStreamHandlerFactory {
+  private final String profile;
+
+  S3URLStreamHandlerFactory(String profile) {
+    this.profile = profile;
+  }
+
   @Override
   public URLStreamHandler createURLStreamHandler(String protocol) {
     if ("s3".equals(protocol)) {
       return new URLStreamHandler() {
         @Override
         protected URLConnection openConnection(URL url) throws IOException {
-          return new S3URLConnection(url);
+          return new S3URLConnection(profile, url);
         }
       };
     }

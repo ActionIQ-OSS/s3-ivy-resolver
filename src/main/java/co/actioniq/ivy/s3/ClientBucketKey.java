@@ -20,7 +20,6 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
-import org.apache.ivy.util.Message;
 
 import java.io.File;
 
@@ -37,31 +36,27 @@ class ClientBucketKey {
   String key() { return bucketAndKey.key; }
 
   S3Object getObject(String bucketName, String key) {
-    log("AIQ S3 getObject bucketName: " + bucketName + ", key: " + key);
+    Log.print("getObject bucketName: " + bucketName + ", key: " + key);
     return client.getObject(bucketName, key);
   }
 
   ObjectMetadata getObject(final GetObjectRequest getObjectRequest, File destinationFile) {
-    log("AIQ S3 getObject request: " + getObjectRequest + ", destinationFile: " + destinationFile);
+    Log.print("getObject request: " + getObjectRequest + ", destinationFile: " + destinationFile);
     return client.getObject(getObjectRequest, destinationFile);
   }
 
   ObjectMetadata getObjectMetadata(String bucketName, String key) {
-    log("AIQ S3 getObjectMetadata bucketName: " + bucketName + ", key: " + key);
+    Log.print("getObjectMetadata bucketName: " + bucketName + ", key: " + key);
     return client.getObjectMetadata(bucketName, key);
   }
 
   ObjectListing listObjects(ListObjectsRequest listObjectsRequest) {
-    log("AIQ S3 listObjects request: " + listObjectsRequest);
+    Log.print("listObjects request: " + listObjectsRequest);
     return client.listObjects(listObjectsRequest);
   }
 
   PutObjectResult putObject(String bucketName, String key, File file) {
-    log("AIQ S3 putObject bucketName: " + bucketName + ", key: " + key + ", file: " + file);
+    Log.print("putObject bucketName: " + bucketName + ", key: " + key + ", file: " + file);
     return client.putObject(bucketName, key, file);
-  }
-
-  private void log(String message) {
-    Message.info(message);
   }
 }

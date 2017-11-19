@@ -36,45 +36,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 class S3URLHandler implements URLHandler {
-  // One time setup to register our handler for S3:// urls in Ivy
-  private static final boolean _init = initHandlers();
+  private S3URLUtil s3URLUtil;
 
-  private S3URLUtil s3URLUtil = new S3URLUtil();
-
-  private static boolean initHandlers() {
-    initDispatcher();
-    initStreamHandler();
-    return true;
-  }
-
-  private static void initDispatcher() {
-    URLHandler defaultHandler = URLHandlerRegistry.getDefault();
-    URLHandlerDispatcher dispatcher;
-    if (defaultHandler instanceof URLHandlerDispatcher) {
-      debug("Using the existing Ivy URLHandlerDispatcher to handle s3:// URLs");
-      dispatcher = (URLHandlerDispatcher)defaultHandler;
-    } else {
-      debug("Creating a new Ivy URLHandlerDispatcher to handle s3:// URLs");
-      dispatcher = new URLHandlerDispatcher();
-      dispatcher.setDefault(defaultHandler);
-      URLHandlerRegistry.setDefault(dispatcher);
-    }
-    dispatcher.setDownloader("s3", new S3URLHandler());
-  }
-
-  private static void initStreamHandler() {
-    // We need s3:// URLs to work without throwing a java.net.MalformedURLException
-    // which means installing a dummy URLStreamHandler.  We only install the handler
-    // if it's not already installed (since a second call to URL.setURLStreamHandlerFactory
-    // will fail).
-    try {
-      new URL("s3://example.com");
-      debug("The s3:// URLStreamHandler is already installed");
-    } catch (MalformedURLException e) {
-      // This means we haven't installed the handler, so install it
-        debug("Installing the s3:// URLStreamHandler via java.net.URL.setURLStreamHandlerFactory");
-        URL.setURLStreamHandlerFactory(new S3URLStreamHandlerFactory());
-    }
+  S3URLHandler(String profile) {
+    s3URLUtil = new S3URLUtil(profile);
   }
 
   public boolean isReachable(URL url) {
@@ -109,13 +74,9 @@ class S3URLHandler implements URLHandler {
     Message.info(msg);
   }
 
-  private static void debug(String msg) {
-    Message.debug("S3URLHandler." + msg);
-  }
-
   public URLInfo getURLInfo(URL url, int timeout) {
     try {
-      debug("getURLInfo(" + url + ", " + timeout + ")");
+      Log.print("getURLInfo(" + url + ", " + timeout + ")");
 
       ClientBucketKey cbk = s3URLUtil.getClientBucketAndKey(url);
 
@@ -134,7 +95,7 @@ class S3URLHandler implements URLHandler {
   }
 
   public InputStream openStream(URL url) {
-    debug("openStream(" + url + ")");
+    Log.print("openStream(" + url + ")");
 
     ClientBucketKey cbk = s3URLUtil.getClientBucketAndKey(url);
     S3Object obj = cbk.getObject(cbk.bucket(), cbk.key());
@@ -145,7 +106,7 @@ class S3URLHandler implements URLHandler {
    * A directory listing for keys/directories under this prefix
    */
   List<URL> list(URL url) throws MalformedURLException {
-    debug("list(" + url + ")");
+    Log.print("list(" + url + ")");
 
       /* key is the prefix in this case */
     ClientBucketKey cbk = s3URLUtil.getClientBucketAndKey(url);
@@ -167,7 +128,7 @@ class S3URLHandler implements URLHandler {
     String urlWithSlash = Strings.stripSuffix(url.toString(), "/") + "/";
     Stream<URL> res = Stream.concat(keys, summaryKeys).map(k -> toURL(urlWithSlash + Strings.stripPrefix(k, prefix)));
 
-    debug("list(" + url + ") => \n  " + res);
+    Log.print("list(" + url + ") => \n  " + res);
 
     return res.collect(Collectors.toList());
   }
@@ -182,7 +143,7 @@ class S3URLHandler implements URLHandler {
 
   @SuppressWarnings("RV_RETURN_VALUE_IGNORED_BAD_PRACTICE")
   public void download(URL src, File dest, CopyProgressListener l) {
-    debug("download(" + src + ", " + dest + ")");
+    Log.print("download(" + src + ", " + dest + ")");
 
     ClientBucketKey cbk = s3URLUtil.getClientBucketAndKey(src);
 
@@ -200,7 +161,7 @@ class S3URLHandler implements URLHandler {
   }
 
   public void upload(File src, URL dest, CopyProgressListener l) {
-    debug("upload(" + src + ", " + dest + ")");
+    Log.print("upload(" + src + ", " + dest + ")");
 
     CopyProgressEvent event = new CopyProgressEvent();
     if (null != l) {
@@ -217,6 +178,6 @@ class S3URLHandler implements URLHandler {
 
   // I don't think we care what this is set to
   public void setRequestMethod(int requestMethod) {
-    debug("setRequestMethod(" + requestMethod + ")");
+    Log.print("setRequestMethod(" + requestMethod + ")");
   }
 }

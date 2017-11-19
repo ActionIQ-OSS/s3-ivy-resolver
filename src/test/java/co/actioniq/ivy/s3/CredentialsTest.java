@@ -35,21 +35,4 @@ public class CredentialsTest {
     assertEquals("abcde", credentials.getAWSAccessKeyId());
     assertEquals("fghij", credentials.getAWSSecretKey());
   }
-
-  @Test
-  public void testChain() throws IOException {
-    envVars.set(ACCESS_KEY_ENV_VAR, null);
-    envVars.set(SECRET_KEY_ENV_VAR, null);
-
-    String name = "23498sddflskdfjcsxlf1234";
-    File file = new File(Constants.DotIvyDir, "." + name);
-    file.deleteOnExit();
-    Files.write(file.toPath(), data.getBytes());
-
-    S3URLUtil util = new S3URLUtil(name);
-    AWSCredentialsProviderChain chain = util.makeCredentialsProviderChain("foosdfsdflkj");
-    AWSCredentials credentials = chain.getCredentials();
-    assertEquals("abcde", credentials.getAWSAccessKeyId());
-    assertEquals("fghij", credentials.getAWSSecretKey());
-  }
 }

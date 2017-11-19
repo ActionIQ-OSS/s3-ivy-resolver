@@ -7,8 +7,8 @@ import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSCredentialsProviderChain;
 import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
 import com.amazonaws.auth.InstanceProfileCredentialsProvider;
-import com.amazonaws.auth.PropertiesFileCredentialsProvider;
 import com.amazonaws.auth.SystemPropertiesCredentialsProvider;
+import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.regions.Regions;
@@ -16,7 +16,6 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3URI;
 import org.apache.ivy.util.Message;
 
-import java.io.File;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,16 +34,12 @@ import java.util.stream.Collectors;
 class S3URLUtil {
   // This is for matching region names in URLs or host names
   private static final Pattern RegionMatcher = makeRegionMatcher();
+  private static final Map<String,AWSCredentials> credentialsCache = new ConcurrentHashMap<>();
 
-  private Map<String,AWSCredentials> credentialsCache = new ConcurrentHashMap<>();
-  private final String credentialFileName;
+  private final String profile;
 
-  S3URLUtil() {
-    this("s3credentials");
-  }
-
-  S3URLUtil(String credentialFileName) {
-    this.credentialFileName = credentialFileName;
+  S3URLUtil(String profile) {
+    this.profile = profile;
   }
 
   ClientBucketKey getClientBucketAndKey(URL url) {
@@ -147,7 +142,7 @@ class S3URLUtil {
 
   private AWSCredentials getCredentials(String bucket) {
     AWSCredentials credentials = credentialsCache.computeIfAbsent(bucket, this::computeCredentials);
-    Message.debug("S3URLHandler - Using AWS Access Key Id: "+credentials.getAWSAccessKeyId()+" for bucket: "+bucket);
+    Log.print("S3URLHandler - Using AWS Access Key Id: "+credentials.getAWSAccessKeyId()+" for bucket: "+bucket);
     return credentials;
   }
 
@@ -164,47 +159,10 @@ class S3URLUtil {
 
   private AWSCredentials computeCredentials(String bucket) {
     try {
-      return makeCredentialsProviderChain(bucket).getCredentials();
+      return Credentials.makeCredentialsProvider(profile, bucket).getCredentials();
     } catch (AmazonClientException e) {
       Message.error("Unable to find AWS Credentials.");
       throw e;
     }
-  }
-
-  AWSCredentialsProviderChain makeCredentialsProviderChain(String bucket) {
-    AWSCredentialsProvider[] basicProviders = {
-        new BucketSpecificEnvironmentVariableCredentialsProvider(bucket),
-        new BucketSpecificSystemPropertiesCredentialsProvider(bucket),
-        makePropertiesFileCredentialsProvider("." + credentialFileName + "_" + bucket),
-        makePropertiesFileCredentialsProvider("." + bucket + "_" + credentialFileName),
-        new EnvironmentVariableCredentialsProvider(),
-        new SystemPropertiesCredentialsProvider(),
-        makePropertiesFileCredentialsProvider("." + credentialFileName),
-        new InstanceProfileCredentialsProvider()
-    };
-
-    AWSCredentialsProviderChain basicProviderChain = new AWSCredentialsProviderChain(basicProviders);
-
-    AWSCredentialsProvider[] roleProviders = {
-        new BucketSpecificRoleBasedEnvironmentVariableCredentialsProvider(basicProviderChain, bucket),
-        new BucketSpecificRoleBasedSystemPropertiesCredentialsProvider(basicProviderChain, bucket),
-        new RoleBasedPropertiesFileCredentialsProvider(basicProviderChain, "." + credentialFileName + "_" + bucket),
-        new RoleBasedPropertiesFileCredentialsProvider(basicProviderChain, "." + bucket + "_" + credentialFileName),
-        new RoleBasedEnvironmentVariableCredentialsProvider(basicProviderChain),
-        new RoleBasedSystemPropertiesCredentialsProvider(basicProviderChain),
-        new RoleBasedPropertiesFileCredentialsProvider(basicProviderChain, "." + credentialFileName)
-    };
-
-    List<AWSCredentialsProvider> providerList = new ArrayList<>();
-    providerList.addAll(Arrays.asList(roleProviders));
-    providerList.addAll(Arrays.asList(basicProviders));
-    AWSCredentialsProvider[] providerArray = providerList.toArray(new AWSCredentialsProvider[providerList.size()]);
-
-    return new AWSCredentialsProviderChain(providerArray);
-  }
-
-  private PropertiesFileCredentialsProvider makePropertiesFileCredentialsProvider(String fileName) {
-    File file = new File(Constants.DotIvyDir, fileName);
-    return new PropertiesFileCredentialsProvider(file.toString());
   }
 }
