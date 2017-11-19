@@ -66,7 +66,7 @@ ivysettings.xml:
       <resolvers>
         <chain name="my-resolver-chain" returnFirst="true">
           <ibiblio name="maven-central" m2compatible="true" descriptor="required" usepoms="true"/>
-          <s3resolver name="aiq" root="s3://s3.amazonaws.com/<my-s3-bucket>/releases"/>
+          <s3resolver name="aiq" root="s3://s3.amazonaws.com/<my-s3-bucket>/releases"/ profile="my-profile">
         </chain>
       </resolvers>
       <settings defaultResolver="my-resolver-chain"/>
