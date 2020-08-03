@@ -36,6 +36,8 @@ class S3URLUtil {
   private static final Pattern RegionMatcher = makeRegionMatcher();
   private static final Map<String,AWSCredentials> credentialsCache = new ConcurrentHashMap<>();
 
+  private static final Map<String, AmazonS3Client> clientCache = new ConcurrentHashMap<>();
+
   private final String profile;
 
   S3URLUtil(String profile) {
@@ -44,7 +46,7 @@ class S3URLUtil {
 
   ClientBucketKey getClientBucketAndKey(URL url) {
     BucketAndKey bk = getBucketAndKey(url);
-    AmazonS3Client client = new AmazonS3Client(getCredentials(bk.bucket), getProxyConfiguration());
+    AmazonS3Client client = getOrCreateAmazonS3Client(bk.bucket);
     Optional<Region> region = getRegion(url, bk.bucket, client);
     region.ifPresent(client::setRegion);
     return new ClientBucketKey(client, bk);
@@ -138,6 +140,16 @@ class S3URLUtil {
     } catch (URISyntaxException e) {
       return Optional.empty();
     }
+  }
+
+  private AmazonS3Client getOrCreateAmazonS3Client(String bucket) {
+    return clientCache.computeIfAbsent(bucket, this::createAmazonS3Client);
+  }
+
+  private AmazonS3Client createAmazonS3Client(String bucket) {
+    AmazonS3Client client = new AmazonS3Client(getCredentials(bucket), getProxyConfiguration());
+
+    return client;
   }
 
   private AWSCredentials getCredentials(String bucket) {
